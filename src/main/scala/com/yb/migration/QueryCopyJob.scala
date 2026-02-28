@@ -8,6 +8,7 @@ import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import java.nio.file.{Files, Paths}
 import java.sql.{DriverManager, Date => SqlDate}
 import java.util.Properties
+import java.time.LocalDate
 
 object QueryCopyJob {
   def main(args: Array[String]): Unit = {
@@ -76,18 +77,42 @@ object QueryCopyJob {
         config.jdbcPartitionUpper.nonEmpty &&
         config.jdbcPartitionNum > 1
 
-    if (usePartitioning) {
+    if (!usePartitioning) {
+      return baseReader.jdbc(config.sourceJdbcUrl, dbTable, props)
+    }
+
+    val lower = config.jdbcPartitionLower
+    val upper = config.jdbcPartitionUpper
+    val num = config.jdbcPartitionNum
+
+    def isNumeric(value: String): Boolean = value.forall(ch => ch == '-' || ch.isDigit)
+
+    if (isNumeric(lower) && isNumeric(upper)) {
       baseReader.jdbc(
         config.sourceJdbcUrl,
         dbTable,
         config.jdbcPartitionColumn,
-        config.jdbcPartitionLower,
-        config.jdbcPartitionUpper,
-        config.jdbcPartitionNum,
+        lower.toLong,
+        upper.toLong,
+        num,
         props
       )
     } else {
-      baseReader.jdbc(config.sourceJdbcUrl, dbTable, props)
+      val startDate = LocalDate.parse(lower)
+      val endDate = LocalDate.parse(upper)
+      val totalDays = Math.max(1L, java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate))
+      val step = Math.max(1L, Math.ceil(totalDays.toDouble / num.toDouble).toLong)
+      val predicates = scala.collection.mutable.ArrayBuffer[String]()
+      var current = startDate
+      while (current.isBefore(endDate)) {
+        val next = current.plusDays(step)
+        val end = if (next.isAfter(endDate)) endDate else next
+        val predicate =
+          s"${config.jdbcPartitionColumn} >= DATE '${current.toString}' AND ${config.jdbcPartitionColumn} < DATE '${end.toString}'"
+        predicates += predicate
+        current = end
+      }
+      baseReader.jdbc(config.sourceJdbcUrl, dbTable, predicates.toArray, props)
     }
   }
 
