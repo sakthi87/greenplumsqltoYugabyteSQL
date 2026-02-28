@@ -1,0 +1,30 @@
+package com.yb.migration.config
+
+case class JobConfig(
+  sourceJdbcUrl: String,
+  sourceUser: String,
+  sourcePassword: String,
+  targetJdbcUrl: String,
+  targetUser: String,
+  targetPassword: String,
+  targetSchema: String,
+  targetTable: String,
+  sqlStartDate: String,
+  sqlEndDate: String,
+  batchEnabled: Boolean,
+  batchWindowDays: Int,
+  batchMaxBatches: Int,
+  copyReplace: Boolean,
+  csvDelimiter: String,
+  csvNull: String,
+  csvQuote: String,
+  csvEscape: String,
+  copyFlushEvery: Int,
+  fetchSize: Int,
+  repartition: Int,
+  disableTransactionalWrites: Boolean,
+  jdbcPartitionColumn: String,
+  jdbcPartitionLower: String,
+  jdbcPartitionUpper: String,
+  jdbcPartitionNum: Int
+)

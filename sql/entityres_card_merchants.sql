@@ -1,0 +1,115 @@
+WITH stage AS (
+  SELECT
+    concat_ws('|',
+      a.acquirer_member_id,
+      a.merchant_ica_nbr,
+      a.mvv_id,
+      a.merchant_nbr,
+      a.merchant_nm,
+      a.merchant_city_nm,
+      a.merchant_state_nm,
+      a.merchant_postal_cde,
+      a.merchant_country_cde,
+      a.merchant_sic_cde
+    ) AS party_id,
+    a.acquirer_member_id,
+    a.merchant_ica_nbr,
+    a.mvv_id,
+    a.merchant_nbr,
+    a.merchant_nm,
+    a.merchant_city_nm,
+    a.merchant_state_nm,
+    a.merchant_postal_cde,
+    a.merchant_country_cde,
+    a.merchant_sic_cde,
+    a.business_card_account_nbr,
+    a.usd_amt,
+    a.transaction_posted_dt,
+    a.transaction_posted_dt::date AS txn_posted_date
+  FROM moneymovement_source.staging_cust360_corp_credit_card_trans a
+  WHERE a.merchant_nbr IS NOT NULL
+    AND a.merchant_nbr <> '000000000000000'
+    AND a.merchant_sic_cde <> '0000'
+    AND a.transaction_posted_dt >= DATE '{{start_date}}'
+    AND a.transaction_posted_dt < DATE '{{end_date}}'
+)
+SELECT
+  s.party_id,
+  NULL AS card_network,
+  s.acquirer_member_id,
+  s.merchant_ica_nbr,
+  s.mvv_id,
+  s.merchant_nbr,
+  s.merchant_nm,
+  s.merchant_city_nm,
+  s.merchant_state_nm,
+  s.merchant_postal_cde,
+  s.merchant_country_cde,
+  s.merchant_sic_cde,
+  COUNT(DISTINCT s.business_card_account_nbr) AS counter_party_cnt,
+  SUM(s.usd_amt) AS total_usd_amount,
+  COUNT(*) AS total_tnx_count,
+  MAX(s.transaction_posted_dt) AS last_tnx_date,
+  CURRENT_DATE AS record_load_date,
+  NULL AS phone_number,
+  NULL AS url,
+  NULL AS merchant_address_clean,
+  NULL AS merchant_city_nm_clean,
+  NULL AS merchant_state_nm_clean,
+  NULL AS merchant_country_cde_clean,
+  NULL AS merchant_location_code,
+  NULL AS merchant_party_name_clean,
+  NULL AS merchant_party_abbriviation,
+  NULL AS merchant_acquirer_abbriviation,
+  NULL AS finstrp_raw_name,
+  NULL AS fnstrip_party_name_clean,
+  NULL AS party_name_array,
+  NULL AS party_cleansing_process_date,
+  NULL AS party_cleansing_source,
+  NULL AS spgid,
+  NULL AS spgid_match_validation_code,
+  NULL AS spgid_match_validation_date,
+  NULL AS spgid_match_validation_id,
+  NULL AS spgid_match_resolution_source,
+  NULL AS spgid_match_confidence_score,
+  NULL AS duns_number,
+  NULL AS duns_match_validation_code,
+  NULL AS duns_match_validation_date,
+  NULL AS duns_match_validation_id,
+  NULL AS duns_match_resolution_source,
+  NULL AS duns_match_confidence_score,
+  NULL AS merchant_usb_ac360_arrangement_id,
+  NULL AS merchant_usb_lpid_txt,
+  NULL AS merchant_usb_source_type,
+  NULL AS merchant_acquirer_duns_number,
+  NULL AS merchant_acquirer_duns_match_validation_code,
+  NULL AS merchant_acquirer_duns_match_validation_date,
+  NULL AS merchant_acquirer_duns_match_validation_id,
+  NULL AS merchant_acquirer_duns_match_resolution_source,
+  NULL AS merchant_acquirer_duns_match_confidence_score,
+  NULL AS merchant_nbr_clean,
+  NULL AS first_occur_date
+FROM stage s
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM moneymovement_source.tbl_entityres_card_merchants t
+  WHERE t.party_id = s.party_id
+)
+AND NOT EXISTS (
+  SELECT 1
+  FROM moneymovement_source.tbl_entityres_card_merchants t
+  WHERE t.record_load_date = s.txn_posted_date
+)
+GROUP BY
+  s.party_id,
+  s.acquirer_member_id,
+  s.merchant_ica_nbr,
+  s.mvv_id,
+  s.merchant_nbr,
+  s.merchant_nm,
+  s.merchant_city_nm,
+  s.merchant_state_nm,
+  s.merchant_postal_cde,
+  s.merchant_country_cde,
+  s.merchant_sic_cde,
+  s.txn_posted_date;
