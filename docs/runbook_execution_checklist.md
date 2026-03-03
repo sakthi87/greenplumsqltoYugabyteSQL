@@ -1,26 +1,43 @@
 ## Spark Execution Checklist
 
-### Pre-run
+### 1) Prerequisites
 - Confirm Java 11+ and Spark 3.x are installed.
 - Verify network access from Spark nodes to YugabyteDB.
 - Confirm JDBC credentials for source and target.
 - Ensure the SQL file exists on the Spark submit host.
 - Decide full refresh window (`sql.start_date`, `sql.end_date`).
-- Create sandbox copies of source/target tables if you want zero impact on production tables.
-- Optional: enable batching and/or JDBC partitioning if needed.
-- Optional: precompute `party_id` on the staging table for faster scans.
 
-### Run
-- Build or use the provided jar.
-- If using sandbox tables, run the setup SQL first:
+### 2) Sandbox table creation (optional but recommended)
+- Create sandbox copies so production tables are not touched:
 
 ```
 psql -h <yb_host> -p 5433 -U <user> -d <db> -f sql/setup_duplicate_tables.sql
 ```
 
-- If using sandbox tables, update `job.properties`:
+### 3) Add and populate `party_id` (optional, recommended for 1-hour target)
+- If using sandbox tables, apply these to the sandbox staging table.
+
+```
+ALTER TABLE moneymovement_source.staging_cust360_corp_credit_card_trans_sandbox
+ADD COLUMN party_id text;
+
+UPDATE moneymovement_source.staging_cust360_corp_credit_card_trans_sandbox
+SET party_id = concat_ws('|', acquirer_member_id, merchant_ica_nbr, mvv_id,
+  merchant_nbr, merchant_nm, merchant_city_nm, merchant_state_nm,
+  merchant_postal_cde, merchant_country_cde, merchant_sic_cde);
+
+CREATE INDEX ON moneymovement_source.staging_cust360_corp_credit_card_trans_sandbox (party_id);
+```
+
+### 4) Update job properties
+- If using sandbox tables, set:
   - `target.table=tbl_entityres_card_merchants_sandbox`
-  - Use `sql/entityres_card_merchants_sandbox.sql` (or `..._party_id.sql` if precomputed).
+- Choose the SQL file:
+  - `sql/entityres_card_merchants_sandbox.sql`
+  - or `sql/entityres_card_merchants_party_id.sql` (if `party_id` is precomputed)
+
+### 5) Run Spark submit
+- Build or use the provided jar.
 - Run `spark-submit` with job properties and SQL file:
 
 ```
@@ -33,7 +50,7 @@ spark-submit \
 
 ---
 
-## Performance tuning (Standalone Spark)
+### 6) Performance tuning (Standalone Spark)
 
 ### 1) JDBC partitioning: how to pick bounds
 
@@ -205,7 +222,7 @@ For heavy read aggregation (optional per session):
 
 Use these only for the Spark JDBC session, not globally.
 
-### Post-run validation
+### 7) Post-run validation
 - Row count check:
 
 ```
