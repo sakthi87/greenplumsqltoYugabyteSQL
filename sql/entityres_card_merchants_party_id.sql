@@ -1,17 +1,6 @@
 WITH stage AS (
   SELECT
-    concat_ws('|',
-      a.acquirer_member_id,
-      a.merchant_ica_nbr,
-      a.mvv_id,
-      a.merchant_nbr,
-      a.merchant_nm,
-      a.merchant_city_nm,
-      a.merchant_state_nm,
-      a.merchant_postal_cde,
-      a.merchant_country_cde,
-      a.merchant_sic_cde
-    ) AS party_id,
+    a.party_id,
     a.acquirer_member_id,
     a.merchant_ica_nbr,
     a.mvv_id,
@@ -26,7 +15,8 @@ WITH stage AS (
     a.usd_amt,
     a.transaction_posted_dt
   FROM moneymovement_source.staging_cust360_corp_credit_card_trans a
-  WHERE a.merchant_nbr IS NOT NULL
+  WHERE a.party_id IS NOT NULL
+    AND a.merchant_nbr IS NOT NULL
     AND a.merchant_nbr <> '000000000000000'
     AND a.merchant_sic_cde <> '0000'
     AND a.transaction_posted_dt >= DATE '{{start_date}}'

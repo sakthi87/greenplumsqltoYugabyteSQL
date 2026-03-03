@@ -25,7 +25,7 @@ WITH stage AS (
     a.business_card_account_nbr,
     a.usd_amt,
     a.transaction_posted_dt
-  FROM moneymovement_source.staging_cust360_corp_credit_card_trans a
+  FROM moneymovement_source.staging_cust360_corp_credit_card_trans_sandbox a
   WHERE a.merchant_nbr IS NOT NULL
     AND a.merchant_nbr <> '000000000000000'
     AND a.merchant_sic_cde <> '0000'
