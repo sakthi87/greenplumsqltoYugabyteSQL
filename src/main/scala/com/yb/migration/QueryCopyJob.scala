@@ -85,7 +85,12 @@ object QueryCopyJob {
     val upper = config.jdbcPartitionUpper
     val num = config.jdbcPartitionNum
 
-    def isNumeric(value: String): Boolean = value.forall(ch => ch == '-' || ch.isDigit)
+    def isNumeric(value: String): Boolean = {
+      if (value == null || value.isEmpty) return false
+      val start = if (value.charAt(0) == '-') 1 else 0
+      if (start == value.length) return false
+      value.substring(start).forall(_.isDigit)
+    }
 
     if (isNumeric(lower) && isNumeric(upper)) {
       baseReader.jdbc(
