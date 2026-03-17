@@ -148,14 +148,14 @@ object QueryCopyJob {
       }
       val hostList = config.sourceJdbcHosts.mkString(",")
       val base = s"jdbc:yugabytedb://$hostList:${config.sourceJdbcPort}/$db"
-      val params = buildJdbcParams(config)
+      val params = buildSourceJdbcParams(config)
       if (params.nonEmpty) s"$base?$params" else base
     } else {
       config.sourceJdbcUrl
     }
   }
 
-  private def buildJdbcParams(config: JobConfig): String = {
+  private def buildSourceJdbcParams(config: JobConfig): String = {
     val params = scala.collection.mutable.ListBuffer[String]()
     if (config.sourceJdbcLoadBalance) {
       params += "load-balance=true"
@@ -173,7 +173,7 @@ object QueryCopyJob {
       withoutParams.substring(idx + 1)
     } else {
       throw new IllegalArgumentException(
-        "source.jdbc.database is required when source.jdbc.hosts is set and the JDBC URL has no database"
+        "yugabyte.source.database is required when yugabyte.source.hosts is set and the JDBC URL has no database"
       )
     }
   }
@@ -182,11 +182,12 @@ object QueryCopyJob {
     val columns = df.schema.fields.map(_.name).toSeq
     val copySql = CopyStatementBuilder.buildCopyStatement(config, columns)
     val schema = df.schema
+    val targetJdbcUrl = buildTargetJdbcUrl(config)
 
     df.foreachPartition { rows: Iterator[Row] =>
       if (rows.nonEmpty) {
         val conn = DriverManager.getConnection(
-          config.targetJdbcUrl,
+          targetJdbcUrl,
           config.targetUser,
           config.targetPassword
         )
@@ -234,5 +235,32 @@ object QueryCopyJob {
         }
       }
     }
+  }
+
+  private def buildTargetJdbcUrl(config: JobConfig): String = {
+    if (config.targetJdbcHosts.nonEmpty) {
+      val db = if (config.targetJdbcDatabase.nonEmpty) {
+        config.targetJdbcDatabase
+      } else {
+        parseDatabaseFromJdbcUrl(config.targetJdbcUrl)
+      }
+      val hostList = config.targetJdbcHosts.mkString(",")
+      val base = s"jdbc:yugabytedb://$hostList:${config.targetJdbcPort}/$db"
+      val params = buildTargetJdbcParams(config)
+      if (params.nonEmpty) s"$base?$params" else base
+    } else {
+      config.targetJdbcUrl
+    }
+  }
+
+  private def buildTargetJdbcParams(config: JobConfig): String = {
+    val params = scala.collection.mutable.ListBuffer[String]()
+    if (config.targetJdbcLoadBalance) {
+      params += "load-balance=true"
+    }
+    if (config.targetJdbcParams.nonEmpty) {
+      params += config.targetJdbcParams
+    }
+    params.mkString("&")
   }
 }
