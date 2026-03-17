@@ -11,6 +11,8 @@ import java.util.Properties
 import java.time.LocalDate
 
 object QueryCopyJob {
+  private val JdbcDriverClass = "com.yugabyte.Driver"
+
   def main(args: Array[String]): Unit = {
     if (args.length < 2) {
       System.err.println("Usage: QueryCopyJob <job.properties> <sql_file>")
@@ -20,6 +22,8 @@ object QueryCopyJob {
     val configPath = args(0)
     val sqlPath = args(1)
     val config = ConfigLoader.load(configPath)
+    // Ensure JDBC driver is loaded and registered for Spark JDBC reader
+    Class.forName(JdbcDriverClass)
     val rawSql = new String(Files.readAllBytes(Paths.get(sqlPath)), "UTF-8")
 
     val spark = SparkSession.builder().appName("YB Query COPY Job").getOrCreate()
@@ -68,6 +72,7 @@ object QueryCopyJob {
     props.put("user", config.sourceUser)
     props.put("password", config.sourcePassword)
     props.put("fetchsize", config.fetchSize.toString)
+    props.put("driver", JdbcDriverClass)
     val dbTable = s"($sql) AS src"
 
     val baseReader = spark.read
