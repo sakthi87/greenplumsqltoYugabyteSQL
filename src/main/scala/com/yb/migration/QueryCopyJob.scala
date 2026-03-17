@@ -38,6 +38,8 @@ object QueryCopyJob {
     rawSql
       .replace("{{start_date}}", startDate)
       .replace("{{end_date}}", endDate)
+      .trim
+      .stripSuffix(";")
   }
 
   private def runBatches(spark: SparkSession, config: JobConfig, rawSql: String): Unit = {
@@ -73,7 +75,18 @@ object QueryCopyJob {
     props.put("password", config.sourcePassword)
     props.put("fetchsize", config.fetchSize.toString)
     props.put("driver", JdbcDriverClass)
+    // Read-optimized JDBC properties (safe defaults)
+    props.put("preferQueryMode", "simple")
+    props.put("binaryTransfer", "false")
+    props.put("stringtype", "unspecified")
+    props.put("reWriteBatchedInserts", "true")
+    props.put("connectTimeout", "10")
+    props.put("loginTimeout", "10")
+    props.put("socketTimeout", "0")
+    props.put("tcpKeepAlive", "true")
+    props.put("keepAlive", "true")
     val dbTable = s"($sql) AS src"
+    val sourceJdbcUrl = buildSourceJdbcUrl(config)
 
     val baseReader = spark.read
     val usePartitioning =
@@ -83,7 +96,7 @@ object QueryCopyJob {
         config.jdbcPartitionNum > 1
 
     if (!usePartitioning) {
-      return baseReader.jdbc(config.sourceJdbcUrl, dbTable, props)
+      return baseReader.jdbc(sourceJdbcUrl, dbTable, props)
     }
 
     val lower = config.jdbcPartitionLower
@@ -99,7 +112,7 @@ object QueryCopyJob {
 
     if (isNumeric(lower) && isNumeric(upper)) {
       baseReader.jdbc(
-        config.sourceJdbcUrl,
+        sourceJdbcUrl,
         dbTable,
         config.jdbcPartitionColumn,
         lower.toLong,
@@ -122,7 +135,46 @@ object QueryCopyJob {
         predicates += predicate
         current = end
       }
-      baseReader.jdbc(config.sourceJdbcUrl, dbTable, predicates.toArray, props)
+      baseReader.jdbc(sourceJdbcUrl, dbTable, predicates.toArray, props)
+    }
+  }
+
+  private def buildSourceJdbcUrl(config: JobConfig): String = {
+    if (config.sourceJdbcHosts.nonEmpty) {
+      val db = if (config.sourceJdbcDatabase.nonEmpty) {
+        config.sourceJdbcDatabase
+      } else {
+        parseDatabaseFromJdbcUrl(config.sourceJdbcUrl)
+      }
+      val hostList = config.sourceJdbcHosts.mkString(",")
+      val base = s"jdbc:yugabytedb://$hostList:${config.sourceJdbcPort}/$db"
+      val params = buildJdbcParams(config)
+      if (params.nonEmpty) s"$base?$params" else base
+    } else {
+      config.sourceJdbcUrl
+    }
+  }
+
+  private def buildJdbcParams(config: JobConfig): String = {
+    val params = scala.collection.mutable.ListBuffer[String]()
+    if (config.sourceJdbcLoadBalance) {
+      params += "load-balance=true"
+    }
+    if (config.sourceJdbcParams.nonEmpty) {
+      params += config.sourceJdbcParams
+    }
+    params.mkString("&")
+  }
+
+  private def parseDatabaseFromJdbcUrl(jdbcUrl: String): String = {
+    val withoutParams = jdbcUrl.takeWhile(_ != '?')
+    val idx = withoutParams.lastIndexOf('/')
+    if (idx >= 0 && idx + 1 < withoutParams.length) {
+      withoutParams.substring(idx + 1)
+    } else {
+      throw new IllegalArgumentException(
+        "source.jdbc.database is required when source.jdbc.hosts is set and the JDBC URL has no database"
+      )
     }
   }
 

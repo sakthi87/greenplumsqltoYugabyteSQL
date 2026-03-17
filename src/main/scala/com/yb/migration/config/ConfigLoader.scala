@@ -30,6 +30,15 @@ object ConfigLoader {
       sourceJdbcUrl = get("source.jdbc.url"),
       sourceUser = get("source.jdbc.user"),
       sourcePassword = get("source.jdbc.password"),
+      sourceJdbcHosts = getOrDefault("source.jdbc.hosts", "")
+        .split(",")
+        .map(_.trim)
+        .filter(_.nonEmpty)
+        .toList,
+      sourceJdbcPort = getOrDefault("source.jdbc.port", "5433").toInt,
+      sourceJdbcDatabase = getOrDefault("source.jdbc.database", ""),
+      sourceJdbcParams = getOrDefault("source.jdbc.params", ""),
+      sourceJdbcLoadBalance = getOrDefault("source.jdbc.load_balance", "true").toBoolean,
       targetJdbcUrl = get("target.jdbc.url"),
       targetUser = get("target.jdbc.user"),
       targetPassword = get("target.jdbc.password"),
