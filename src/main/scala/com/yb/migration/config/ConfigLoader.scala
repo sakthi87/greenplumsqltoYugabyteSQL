@@ -27,30 +27,30 @@ object ConfigLoader {
     }
 
     JobConfig(
-      sourceJdbcUrl = get("yugabyte.source.jdbc.url"),
+      sourceHost = getOrDefault("yugabyte.source.host", "localhost"),
+      sourceHosts = getOrDefault("yugabyte.source.hosts", "")
+        .split(",")
+        .map(_.trim)
+        .filter(_.nonEmpty)
+        .toList,
+      sourcePort = getOrDefault("yugabyte.source.port", "5433").toInt,
+      sourceDatabase = get("yugabyte.source.database"),
       sourceUser = get("yugabyte.source.username"),
       sourcePassword = get("yugabyte.source.password"),
-      sourceJdbcHosts = getOrDefault("yugabyte.source.hosts", "")
+      sourceJdbcParams = getOrDefault("yugabyte.source.jdbc.params", ""),
+      sourceLoadBalanceHosts = getOrDefault("yugabyte.source.loadBalanceHosts", "true").toBoolean,
+      targetHost = getOrDefault("yugabyte.target.host", "localhost"),
+      targetHosts = getOrDefault("yugabyte.target.hosts", "")
         .split(",")
         .map(_.trim)
         .filter(_.nonEmpty)
         .toList,
-      sourceJdbcPort = getOrDefault("yugabyte.source.port", "5433").toInt,
-      sourceJdbcDatabase = getOrDefault("yugabyte.source.database", ""),
-      sourceJdbcParams = getOrDefault("yugabyte.source.jdbc.params", ""),
-      sourceJdbcLoadBalance = getOrDefault("yugabyte.source.loadBalanceHosts", "true").toBoolean,
-      targetJdbcUrl = get("yugabyte.target.jdbc.url"),
+      targetPort = getOrDefault("yugabyte.target.port", "5433").toInt,
+      targetDatabase = get("yugabyte.target.database"),
       targetUser = get("yugabyte.target.username"),
       targetPassword = get("yugabyte.target.password"),
-      targetJdbcHosts = getOrDefault("yugabyte.target.hosts", "")
-        .split(",")
-        .map(_.trim)
-        .filter(_.nonEmpty)
-        .toList,
-      targetJdbcPort = getOrDefault("yugabyte.target.port", "5433").toInt,
-      targetJdbcDatabase = getOrDefault("yugabyte.target.database", ""),
       targetJdbcParams = getOrDefault("yugabyte.target.jdbc.params", ""),
-      targetJdbcLoadBalance = getOrDefault("yugabyte.target.loadBalanceHosts", "true").toBoolean,
+      targetLoadBalanceHosts = getOrDefault("yugabyte.target.loadBalanceHosts", "true").toBoolean,
       targetSchema = get("target.schema"),
       targetTable = get("target.table"),
       sqlStartDate = getOrDefault("sql.start_date", "1970-01-01"),

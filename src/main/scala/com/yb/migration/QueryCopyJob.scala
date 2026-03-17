@@ -140,42 +140,22 @@ object QueryCopyJob {
   }
 
   private def buildSourceJdbcUrl(config: JobConfig): String = {
-    if (config.sourceJdbcHosts.nonEmpty) {
-      val db = if (config.sourceJdbcDatabase.nonEmpty) {
-        config.sourceJdbcDatabase
-      } else {
-        parseDatabaseFromJdbcUrl(config.sourceJdbcUrl)
-      }
-      val hostList = config.sourceJdbcHosts.mkString(",")
-      val base = s"jdbc:yugabytedb://$hostList:${config.sourceJdbcPort}/$db"
-      val params = buildSourceJdbcParams(config)
-      if (params.nonEmpty) s"$base?$params" else base
-    } else {
-      config.sourceJdbcUrl
-    }
+    val hosts = if (config.sourceHosts.nonEmpty) config.sourceHosts else List(config.sourceHost)
+    val hostList = hosts.mkString(",")
+    val base = s"jdbc:yugabytedb://$hostList:${config.sourcePort}/${config.sourceDatabase}"
+    val params = buildSourceJdbcParams(config)
+    if (params.nonEmpty) s"$base?$params" else base
   }
 
   private def buildSourceJdbcParams(config: JobConfig): String = {
     val params = scala.collection.mutable.ListBuffer[String]()
-    if (config.sourceJdbcLoadBalance) {
+    if (config.sourceLoadBalanceHosts) {
       params += "load-balance=true"
     }
     if (config.sourceJdbcParams.nonEmpty) {
       params += config.sourceJdbcParams
     }
     params.mkString("&")
-  }
-
-  private def parseDatabaseFromJdbcUrl(jdbcUrl: String): String = {
-    val withoutParams = jdbcUrl.takeWhile(_ != '?')
-    val idx = withoutParams.lastIndexOf('/')
-    if (idx >= 0 && idx + 1 < withoutParams.length) {
-      withoutParams.substring(idx + 1)
-    } else {
-      throw new IllegalArgumentException(
-        "yugabyte.source.database is required when yugabyte.source.hosts is set and the JDBC URL has no database"
-      )
-    }
   }
 
   private def writeWithCopy(df: DataFrame, config: JobConfig): Unit = {
@@ -238,24 +218,16 @@ object QueryCopyJob {
   }
 
   private def buildTargetJdbcUrl(config: JobConfig): String = {
-    if (config.targetJdbcHosts.nonEmpty) {
-      val db = if (config.targetJdbcDatabase.nonEmpty) {
-        config.targetJdbcDatabase
-      } else {
-        parseDatabaseFromJdbcUrl(config.targetJdbcUrl)
-      }
-      val hostList = config.targetJdbcHosts.mkString(",")
-      val base = s"jdbc:yugabytedb://$hostList:${config.targetJdbcPort}/$db"
-      val params = buildTargetJdbcParams(config)
-      if (params.nonEmpty) s"$base?$params" else base
-    } else {
-      config.targetJdbcUrl
-    }
+    val hosts = if (config.targetHosts.nonEmpty) config.targetHosts else List(config.targetHost)
+    val hostList = hosts.mkString(",")
+    val base = s"jdbc:yugabytedb://$hostList:${config.targetPort}/${config.targetDatabase}"
+    val params = buildTargetJdbcParams(config)
+    if (params.nonEmpty) s"$base?$params" else base
   }
 
   private def buildTargetJdbcParams(config: JobConfig): String = {
     val params = scala.collection.mutable.ListBuffer[String]()
-    if (config.targetJdbcLoadBalance) {
+    if (config.targetLoadBalanceHosts) {
       params += "load-balance=true"
     }
     if (config.targetJdbcParams.nonEmpty) {
